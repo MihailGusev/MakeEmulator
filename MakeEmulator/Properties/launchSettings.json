@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "MakeEmulator": {
+      "commandName": "Project",
+      "commandLineArgs": "D:/makefile\r\nTarget1"
+    }
+  }
+}
