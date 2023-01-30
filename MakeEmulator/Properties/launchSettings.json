@@ -2,7 +2,7 @@
   "profiles": {
     "MakeEmulator": {
       "commandName": "Project",
-      "commandLineArgs": "D:/makefile\r\nTarget1"
+      "commandLineArgs": "D:/makefile\r\nT1"
     }
   }
 }

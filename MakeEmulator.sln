@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.4.33110.190
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MakeEmulator", "MakeEmulator\MakeEmulator.csproj", "{1B6FF3E2-3D0A-44D4-8E20-8C80C8A5462A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MakeEmulator", "MakeEmulator\MakeEmulator.csproj", "{1B6FF3E2-3D0A-44D4-8E20-8C80C8A5462A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
