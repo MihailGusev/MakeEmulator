@@ -1,17 +1,19 @@
 ﻿using MakeEmulator.Graph;
 
-if (args.Length < 2) {
-    Console.WriteLine("You must provide path for makefile and name of the task to run");
+if (args.Length < 1) {
+    Console.WriteLine("You must provide name of the task to run");
     return;
 }
 
-var parseResult = TaskGraph.ParseMakefile(args[0]);
+var path = Path.Combine(Directory.GetCurrentDirectory(), "makefile");
+
+var parseResult = TaskGraph.ParseMakefile(path);
 if (!parseResult.IsSuccess) {
     Console.WriteLine(parseResult.Error);
     return;
 }
 
-var buildResult = parseResult.Value!.Build(args[1]);
+var buildResult = parseResult.Value!.Build(args[0]);
 if (!buildResult.IsSuccess) {
     Console.WriteLine(buildResult.Error);
     return;
