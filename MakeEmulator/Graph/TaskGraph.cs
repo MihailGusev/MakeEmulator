@@ -52,7 +52,7 @@ namespace MakeEmulator.Graph
         /// <param name="taskName">Name of the task to build</param>
         public BuildTaskResult Build(string taskName) {
             if (!nodes.TryGetValue(taskName, out var taskNode)) {
-                return new($"Makefile does not contain a task with {taskName} name");
+                return new($"Makefile does not contain a task named \"{taskName}\"");
             }
 
             var tasksToRun = new List<TaskNode>();

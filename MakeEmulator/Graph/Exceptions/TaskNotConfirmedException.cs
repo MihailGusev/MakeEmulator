@@ -5,7 +5,7 @@
     /// </summary>
     internal class TaskNotConfirmedException : Exception
     {
-        public TaskNotConfirmedException(string taskName) : base($"Makefile does not contain \"{taskName}\" task")
+        public TaskNotConfirmedException(string taskName) : base($"Unable to find a task for dependency named \"{taskName}\"")
         {
         }
     }
