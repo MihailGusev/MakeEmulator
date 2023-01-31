@@ -18,6 +18,8 @@ if (!buildResult.IsSuccess) {
 }
 
 foreach (var task in buildResult.Value!) {
+    // According to the document, we need to display task name as well
+    // but there are only actions displayed in the example
     Console.WriteLine($"Task {task.Name}");
     foreach(var action in task.Actions) {
         Console.WriteLine($"\t{action}");

@@ -110,6 +110,8 @@ namespace MakeEmulator.Graph
                         }
                         var action = stream.ReadLine()!.TrimStart();
                         currentLine++;
+
+                        // If an action is empty string, add it anyway?
                         task.Actions.Add(action);
                     }
                 }
