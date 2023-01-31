@@ -1,7 +1,7 @@
 ﻿namespace MakeEmulator.Graph
 {   
     /// <summary>
-    /// Used to process nodes in dependency graph
+    /// Used to identify loops and repeated dependencies in the graph
     /// </summary>
     internal enum NodeState
     {

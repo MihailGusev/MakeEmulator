@@ -26,11 +26,30 @@ namespace MakeEmulator.Graph
         ///         target2
         /// </para>
         /// </remarks>
-        internal static readonly Regex NameAndDependencies = new(@"^(\S*\b)(?>: (.+))?$", RegexOptions.Compiled);
+        internal static readonly Regex NameAndDependencies = new(@"^([a-zA-Z0-9_]+)(?>: ([a-zA-Z0-9_\s]+))?$", RegexOptions.Compiled);
 
+        /// <summary>
+        /// It is possible to solve the problem without Name and HashCode+Equals
+        /// (using only keys from the graph), thus removing string duplication
+        /// but i thought that nodes shouldn't depend on the graph to get their own dependencies
+        /// </summary>
         public readonly string Name;
         public readonly HashSet<TaskNode> Dependencies = new();
         public readonly List<string> Actions = new();
+
+        /// <summary>
+        /// False for dependencies that haven't yet 
+        /// been confirmed to be present in the makefile as tasks
+        /// </summary>
+        /// 
+        /// <example>
+        /// Here T2's ConfirmedTask property is false at line 1 and becomes true at line 2:
+        /// -----Makefile start------
+        /// T1: T2
+        /// T2
+        /// -----Makefile end--------
+        /// </example>
+        public bool ConfirmedTask { get; internal set; }
 
         internal NodeState State { get; set; } = NodeState.White;
 

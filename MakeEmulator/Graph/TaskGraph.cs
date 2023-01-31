@@ -1,14 +1,15 @@
-﻿using MakeEmulator.Graph.Results;
+﻿using MakeEmulator.Graph.Exceptions;
+using MakeEmulator.Graph.Results;
 
 namespace MakeEmulator.Graph
 {
     /// <summary>
-    /// Represents a set of related tasks in a makefile
+    /// Represents related tasks in a makefile
     /// </summary>
     public class TaskGraph
     {
         /// <summary>
-        /// Set of tasks. Key - name of the task, value - task itself
+        /// Key - name of the task, value - task itself
         /// </summary>
         private readonly Dictionary<string, TaskNode> nodes;
 
@@ -20,23 +21,28 @@ namespace MakeEmulator.Graph
         /// <summary>
         /// Parses makefile into <see cref="TaskGraph"/>
         /// </summary>
+        /// 
+        /// <remarks>
+        /// Loops and missing dependencies are identified at <see cref="Build(string)"/> phase
+        /// </remarks>
+        /// 
         /// <param name="path">Path to the makefile</param>
         public static TaskGraphParseResult ParseMakefile(string path) {
             if (!File.Exists(path)) {
-                return new ($"File {path} does not exist. Make sure you typed it correctly");
+                return new($"File {path} does not exist. Make sure you typed it correctly");
             }
 
             try {
                 var graph = ParseMakefileInternal(path);
-                return new (graph);
+                return new(graph);
             }
             // Exception thrown by the method itself
             catch (FormatException ex) {
-                return new (ex.Message);
+                return new(ex.Message);
             }
             // All other exceptions, thrown by StreamReader
             catch (Exception ex) {
-                return new ($"Something went wrong during parsing process: {ex.Message}");
+                return new($"Something went wrong during parsing process: {ex.Message}");
             }
         }
 
@@ -46,22 +52,24 @@ namespace MakeEmulator.Graph
         /// <param name="taskName">Name of the task to build</param>
         public BuildTaskResult Build(string taskName) {
             if (!nodes.TryGetValue(taskName, out var taskNode)) {
-                return new ($"Makefile does not contain a task with {taskName} name");
+                return new($"Makefile does not contain a task with {taskName} name");
             }
 
             var tasksToRun = new List<TaskNode>();
             try {
                 BuildDfs(taskNode, tasksToRun);
             }
-            catch (LoopException) {
-                return new("Unable to determine build order due to dependency loop");
+            catch (Exception ex) when (ex is TaskNotConfirmedException || ex is LoopException) {
+                return new(ex.Message);
+            }
+            finally {
+                foreach (var task in tasksToRun) {
+                    // Revert state back, so we can call method for another task
+                    task.State = NodeState.White;
+                }
             }
 
-            foreach(var task in tasksToRun) {
-                // Revert state back, so we can call method for another task
-                task.State = NodeState.White;
-            }
-            return new (tasksToRun);
+            return new(tasksToRun);
         }
 
 
@@ -86,11 +94,11 @@ namespace MakeEmulator.Graph
                         throw new FormatException($"Unable to parse the file at line {currentLine}");
                     }
 
-                    var task = GetOrCreate(match.Groups[1].Value, nodes);
+                    var task = GetOrCreate(match.Groups[1].Value, nodes, true);
 
                     var dependencies = match.Groups[2].Value.Split(" ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                     foreach (var dependency in dependencies) {
-                        task.Dependencies.Add(GetOrCreate(dependency, nodes));
+                        task.Dependencies.Add(GetOrCreate(dependency, nodes, false));
                     }
 
                     int iChar;
@@ -115,32 +123,40 @@ namespace MakeEmulator.Graph
         /// </summary>
         /// <param name="name">Name of the task</param>
         /// <param name="nodes">Existing nodes</param>
-        private static TaskNode GetOrCreate(string name, Dictionary<string, TaskNode> nodes) {
-            if (nodes.TryGetValue(name, out var existingTask)) {
-                return existingTask;
+        /// <param name="confirmedTask">True for tasks, false for dependencies</param>
+        private static TaskNode GetOrCreate(string name, Dictionary<string, TaskNode> nodes, bool confirmedTask) {
+            if (!nodes.TryGetValue(name, out var task)) {
+                task = new TaskNode(name);
+                nodes.Add(name, task);
+            }
+            if (confirmedTask) {
+                task.ConfirmedTask = true;
             }
 
-            var task = new TaskNode(name);
-            nodes.Add(name, task);
             return task;
         }
 
         /// <summary>
-        /// Performs depth first search starting from <paramref name="node"/>.
+        /// Performs depth first search starting from <paramref name="node"/>
+        /// and adds processed nodes to <paramref name="blackNodes"/>
         /// </summary>
         /// <param name="node">Current node</param>
-        /// <param name="blackNodes">List of processed</param>
+        /// <param name="blackNodes">List of fully processed nodes</param>
         /// <exception cref="LoopException"></exception>
-        private static void BuildDfs(TaskNode node, List<TaskNode> blackNodes) {
-            // Black color means, that we encountered fully processed node
+        private void BuildDfs(TaskNode node, List<TaskNode> blackNodes) {
+            if (!node.ConfirmedTask) {
+                throw new TaskNotConfirmedException(node.Name);
+            }
+
+            // Black color means, that we already processed this node before
             if (node.State == NodeState.Black) {
                 return;
             }
 
             // Gray color here means that we encountered a node
-            // before processing it's children, so there's a loop
+            // while processing it's children, so there's a loop
             if (node.State == NodeState.Gray) {
-                throw new LoopException();
+                throw new LoopException("Unable to determine build order due to dependency loop");
             }
 
             node.State = NodeState.Gray;
