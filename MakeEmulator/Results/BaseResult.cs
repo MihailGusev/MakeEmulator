@@ -1,9 +1,8 @@
-﻿namespace MakeEmulator.Graph.Results
+﻿namespace MakeEmulator.Results
 {
     /// <summary>
     /// Base class for representing the results of operations
     /// </summary>
-    /// <typeparam name="T"></typeparam>
     public abstract class BaseResult<T>
     {
         public readonly bool IsSuccess;

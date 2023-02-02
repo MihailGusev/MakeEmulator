@@ -1,4 +1,4 @@
-﻿using MakeEmulator.Graph;
+﻿using MakeEmulator.Parsers;
 
 if (args.Length < 1) {
     Console.WriteLine("You must provide name of the task to run");
@@ -7,7 +7,7 @@ if (args.Length < 1) {
 
 var path = Path.Combine(Directory.GetCurrentDirectory(), "makefile");
 
-var parseResult = TaskGraph.ParseMakefile(path);
+var parseResult = new TaskGraphParser().Parse(path);
 if (!parseResult.IsSuccess) {
     Console.WriteLine(parseResult.Error);
     return;
@@ -20,10 +20,8 @@ if (!buildResult.IsSuccess) {
 }
 
 foreach (var task in buildResult.Value!) {
-    // According to the document, we need to display task name as well
-    // but there are only actions displayed in the example
     Console.WriteLine($"Task {task.Name}");
-    foreach(var action in task.Actions) {
+    foreach (var action in task.Actions) {
         Console.WriteLine($"\t{action}");
     }
 }

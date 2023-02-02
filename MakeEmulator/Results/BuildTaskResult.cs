@@ -1,5 +1,7 @@
-﻿namespace MakeEmulator.Graph.Results
-{   
+﻿using MakeEmulator.Nodes;
+
+namespace MakeEmulator.Results
+{
     /// <summary>
     /// Represents build result (list of tasks in the correct dependency order)
     /// so user can see their names and call their actions one by one

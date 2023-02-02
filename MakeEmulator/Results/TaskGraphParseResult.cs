@@ -1,7 +1,9 @@
-﻿namespace MakeEmulator.Graph.Results
+﻿using MakeEmulator.Graph;
+
+namespace MakeEmulator.Results
 {
     /// <summary>
-    /// Represents connections between different tasks
+    /// Represents the results of parsing makefile into <see cref="TaskGraph"/>
     /// </summary>
     public class TaskGraphParseResult : BaseResult<TaskGraph>
     {

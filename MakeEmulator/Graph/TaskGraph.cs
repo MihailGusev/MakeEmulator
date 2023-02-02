@@ -1,5 +1,6 @@
-﻿using MakeEmulator.Graph.Exceptions;
-using MakeEmulator.Graph.Results;
+﻿using MakeEmulator.Nodes;
+using MakeEmulator.Other;
+using MakeEmulator.Results;
 
 namespace MakeEmulator.Graph
 {
@@ -13,37 +14,8 @@ namespace MakeEmulator.Graph
         /// </summary>
         private readonly Dictionary<string, TaskNode> nodes;
 
-
-        private TaskGraph(Dictionary<string, TaskNode> nodes) {
+        public TaskGraph(Dictionary<string, TaskNode> nodes) {
             this.nodes = nodes;
-        }
-
-        /// <summary>
-        /// Parses makefile into <see cref="TaskGraph"/>
-        /// </summary>
-        /// 
-        /// <remarks>
-        /// Loops and missing dependencies are identified at <see cref="Build(string)"/> phase
-        /// </remarks>
-        /// 
-        /// <param name="path">Path to the makefile</param>
-        public static TaskGraphParseResult ParseMakefile(string path) {
-            if (!File.Exists(path)) {
-                return new($"File {path} does not exist. Make sure you typed it correctly");
-            }
-
-            try {
-                var graph = ParseMakefileInternal(path);
-                return new(graph);
-            }
-            // Exception thrown by the method itself
-            catch (FormatException ex) {
-                return new(ex.Message);
-            }
-            // All other exceptions, thrown by StreamReader
-            catch (Exception ex) {
-                return new($"Something went wrong during parsing process: {ex.Message}");
-            }
         }
 
         /// <summary>
@@ -54,121 +26,70 @@ namespace MakeEmulator.Graph
             if (!nodes.TryGetValue(taskName, out var taskNode)) {
                 return new($"Makefile does not contain a task named \"{taskName}\"");
             }
-
-            var tasksToRun = new List<TaskNode>();
             try {
-                BuildDfs(taskNode, tasksToRun);
+                return new(BuildPrivate(taskNode));
             }
-            catch (Exception ex) when (ex is TaskNotConfirmedException || ex is LoopException) {
+            catch (LoopException ex) {
                 return new(ex.Message);
             }
-            finally {
-                foreach (var task in tasksToRun) {
-                    // Revert state back, so we can call method for another task
-                    task.State = NodeState.White;
+        }
+
+        public List<TaskNode> BuildPrivate(TaskNode initial) {
+            // Dictionary and stack operate on the same wrappers.
+            // Dictionary is for checking if node was encountered before
+            // and stack is for depth first search
+            var seen = new Dictionary<string, TaskNodeLoopWrapper>();
+            var nodesInProcess = new Stack<TaskNodeLoopWrapper>();
+
+            void AddNew(TaskNode node) {
+                var wrapper = new TaskNodeLoopWrapper(node);
+                seen.Add(node.Name, wrapper);
+                nodesInProcess.Push(wrapper);
+            }
+
+            AddNew(initial);
+
+            var result = new List<TaskNode>();
+
+            while (nodesInProcess.Count > 0) {
+                var topWrapper = nodesInProcess.Peek();
+
+                // Check if top element has at least one unprocessed dependency
+                if (!topWrapper.HasNext()) {
+                    // If not, then this task is fully processed - mark it and add to the result
+                    nodesInProcess.Pop();
+                    result.Add(topWrapper.TaskNode);
+                    topWrapper.IsProcessed = true;
+                    continue;
+                }
+
+                // Otherwise get next dependency
+                var next = topWrapper.GetNext();
+
+                // If we haven't seen it - add it to the stack and deal with it on the next iteration
+                if (!seen.TryGetValue(next.Name, out var dependencyWrapper)) {
+                    AddNew(next);
+                    continue;
+                }
+
+                // Otherwise it might be one of the two:
+                // 1) dependency loop
+
+                // 2) two tasks have the same dependency:
+                // T1: T2 T3
+                // T2: T3
+                // T3 will be encountered twice, because T1 and T2 both depend on it
+                if (!dependencyWrapper.IsProcessed) {
+                    var loopedNodes = nodesInProcess.Select(n => n.TaskNode.Name).Reverse().ToList();
+                    loopedNodes.Add(loopedNodes[0]);
+
+                    var joined = string.Join(" → ", loopedNodes);
+                    var message = $"Unable to build {initial.Name} due to dependency loop: {Environment.NewLine}{joined}";
+                    throw new LoopException(message);
                 }
             }
 
-            return new(tasksToRun);
-        }
-
-
-        /// <summary>
-        /// Parses makefile into <see cref="TaskGraph"/>
-        /// </summary>
-        /// <param name="path">Path to the makefile</param>
-        /// <exception cref="FormatException"></exception>
-        private static TaskGraph ParseMakefileInternal(string path) {
-            // Keep track of current line number to point the user to it in case of a failure
-            uint currentLine = 0;
-            // Processed tasks. Key - name of the task, value - task itself
-            var nodes = new Dictionary<string, TaskNode>();
-
-            using (var stream = new StreamReader(path)) {
-                string? nameAndDependencies;
-                // Two loops. Outer loop is for names + dependencies
-                while ((nameAndDependencies = stream.ReadLine()) != null) {
-                    currentLine++;
-                    var match = TaskNode.NameAndDependencies.Match(nameAndDependencies);
-                    if (!match.Success) {
-                        throw new FormatException($"Unable to parse the file at line {currentLine}");
-                    }
-
-                    var task = GetOrCreate(match.Groups[1].Value, nodes, true);
-
-                    var dependencies = match.Groups[2].Value.Split(" ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                    foreach (var dependency in dependencies) {
-                        task.Dependencies.Add(GetOrCreate(dependency, nodes, false));
-                    }
-
-                    int iChar;
-                    // Inner loop for actions
-                    while ((iChar = stream.Peek()) != -1) {
-                        // If the first char is not white space, then it must be a new line with task's name and dependencies
-                        if (!char.IsWhiteSpace((char)iChar)) {
-                            break;
-                        }
-                        var action = stream.ReadLine()!.TrimStart();
-                        currentLine++;
-
-                        // If an action is empty string, add it anyway?
-                        task.Actions.Add(action);
-                    }
-                }
-            }
-
-            return new TaskGraph(nodes);
-        }
-
-        /// <summary>
-        /// Returns existing <see cref="TaskNode"/> from the dictionary or creates and adds a new one
-        /// </summary>
-        /// <param name="name">Name of the task</param>
-        /// <param name="nodes">Existing nodes</param>
-        /// <param name="confirmedTask">True for tasks, false for dependencies</param>
-        private static TaskNode GetOrCreate(string name, Dictionary<string, TaskNode> nodes, bool confirmedTask) {
-            if (!nodes.TryGetValue(name, out var task)) {
-                task = new TaskNode(name);
-                nodes.Add(name, task);
-            }
-            if (confirmedTask) {
-                task.ConfirmedTask = true;
-            }
-
-            return task;
-        }
-
-        /// <summary>
-        /// Performs depth first search starting from <paramref name="node"/>
-        /// and adds processed nodes to <paramref name="blackNodes"/>
-        /// </summary>
-        /// <param name="node">Current node</param>
-        /// <param name="blackNodes">List of fully processed nodes</param>
-        /// <exception cref="LoopException"></exception>
-        private void BuildDfs(TaskNode node, List<TaskNode> blackNodes) {
-            if (!node.ConfirmedTask) {
-                throw new TaskNotConfirmedException(node.Name);
-            }
-
-            // Black color means, that we already processed this node before
-            if (node.State == NodeState.Black) {
-                return;
-            }
-
-            // Gray color here means that we encountered a node
-            // while processing it's children, so there's a loop
-            if (node.State == NodeState.Gray) {
-                throw new LoopException("Unable to determine build order due to dependency loop");
-            }
-
-            node.State = NodeState.Gray;
-
-            foreach (var dependency in node.Dependencies) {
-                BuildDfs(dependency, blackNodes);
-            }
-
-            node.State = NodeState.Black;
-            blackNodes.Add(node);
+            return result;
         }
     }
 }
