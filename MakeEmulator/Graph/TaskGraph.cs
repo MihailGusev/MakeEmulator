@@ -80,8 +80,17 @@ namespace MakeEmulator.Graph
                 // T2: T3
                 // T3 will be encountered twice, because T1 and T2 both depend on it
                 if (!dependencyWrapper.IsProcessed) {
-                    var loopedNodes = nodesInProcess.Select(n => n.TaskNode.Name).Reverse().ToList();
-                    loopedNodes.Add(loopedNodes[0]);
+
+                    // Stack must contain unprocessed dependency.
+                    // Construct a list than contains loop chain, so we can show descriptive message
+                    var loopedNodes = new List<string>() { dependencyWrapper.TaskNode.Name };
+                    foreach (var node in nodesInProcess) {
+                        loopedNodes.Add(node.TaskNode.Name);
+                        if (node.TaskNode.Name == dependencyWrapper.TaskNode.Name) {
+                            break;
+                        }
+                    }
+                    loopedNodes.Reverse();
 
                     var joined = string.Join(" → ", loopedNodes);
                     var message = $"Unable to build {initial.Name} due to dependency loop: {Environment.NewLine}{joined}";
